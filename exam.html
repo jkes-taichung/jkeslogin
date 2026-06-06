@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>考試時間與缺考系統</title>
+    <style>
+      /* --- 完整保留你原本的 CSS 樣式 --- */
+      html, body { height: 100%; margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: '微軟正黑體', sans-serif; background-color: #f0f0f0; display: flex; justify-content: center; align-items: stretch; }
+      .container { width: 100%; max-width: 100%; margin: 0; background: white; padding: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; }
+      .header-section { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #ccc; padding-bottom: 10px; margin-bottom: 0px; flex-shrink: 0; }
+      .time-display { font-size: 132px; font-weight: bold; white-space: nowrap; } 
+      .countdown-box { position: relative; background-color: transparent; border: none; padding: 20px 20px; flex-grow: 1.5; min-width: 480px; margin-left: 45px; margin-right: 30px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+      .countdown-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+      .countdown-text { display: flex; justify-content: center; align-items: center; width: 100%; font-size: 100px; color: #111; white-space: nowrap; z-index: 1; text-align: center; } 
+      #countdown-timer { font-weight: bold; font-size: 100px; color: #000000; }
+      .countdown-bear { position: absolute; font-size: 46px; z-index: 10; pointer-events: none; transform: translate(-50%, -50%); transition: none; }
+      .middle-section { display: flex; gap: 30px; margin-bottom: 0px; flex-grow: 1; align-items: stretch; }
+      .schedule-box { flex: 1; font-size: 42px; display: flex; flex-direction: column; gap: 10px; } 
+      .schedule-item { display: flex; flex-direction: column; padding: 10px 22px; border-bottom: 1px solid #eee; min-height: 70px; gap: 8px; align-items: stretch; } 
+      .schedule-item.active { background-color: #fdd835; font-weight: bold; border-radius: 8px; } 
+      .schedule-text-container { display: flex; align-items: center; width: 100%; } 
+      .sub-name { width: 150px; flex-shrink: 0; } 
+      .sub-time { width: 300px; flex-shrink: 0; text-align: left; } 
+      .sub-audio-zone { display: flex; align-items: center; justify-content: flex-start; width: 100%; margin-left: 0; margin-top: 5px;} 
+      .reminder-box { flex: 1; background-color: #fffde7; margin-right: 30px; padding: 20px 30px 10px 30px; border-radius: 15px; min-height: 230px; text-align: center; position: relative; display: flex; align-items: center; justify-content: center; font-size: 60px; font-weight: bold; overflow: hidden; } 
+      .reminder-tag { position: absolute; top: 0; left: 0; background: gold; font-size: 26px; padding: 8px 15px; border-radius: 0 0 15px 0; z-index: 2; } 
+      .reminder-hazard-stripes { position: absolute; bottom: 0; left: 0; width: 100%; height: 24px; background: repeating-linear-gradient( -45deg, #ffdb3a, #ffdb3a 15px, #212121 15px, #212121 30px ); z-index: 1; }
+      .footer-section { display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 20px 30px; border-top: 2px solid #e5e5e5; font-size: 38px; flex-shrink: 0; box-shadow: 0 -4px 10px rgba(0,0,0,0.02); } 
+      select, input[type="number"] { font-size: 33px; padding: 10px 15px; margin: 0 15px; border: 2px solid #dcdcdc; border-radius: 8px; background-color: #fafafa; color: #333; outline: none; transition: all 0.2s ease-in-out; vertical-align: middle; } 
+      select:focus, input[type="number"]:focus { border-color: #fdd835; background-color: #fff; box-shadow: 0 0 8px rgba(253, 216, 53, 0.3); }
+      .submit-btn { font-size: 33px; font-weight: bold; padding: 10px 45px; border: none; background: #212121; color: white; cursor: pointer; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease; } 
+      .submit-btn:hover { background: #424242; transform: translateY(-1px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
+      .submit-btn:active { transform: translateY(1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      .current-subject-text { color: red; font-weight: bold; }
+      audio { width: 435px; height: 45px; outline: none; border-radius: 45px; filter: invert(1) hue-rotate(180deg) contrast(1.2); } 
+      .loading-text { font-size: 30px; color: #ff9800; font-weight: bold; animation: blink 1.5s infinite; } 
+      @keyframes blink { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+      .custom-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); display: none; justify-content: center; align-items: center; z-index: 99999; }
+      .custom-modal-box { background-color: #ffffff; padding: 50px 70px; border-radius: 24px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3); text-align: center; max-width: 85%; width: 700px; animation: modalEffect 0.25s ease-out; }
+      .custom-modal-message { font-size: 45px; font-weight: bold; color: #212121; margin-bottom: 45px; line-height: 1.5; white-space: pre-line; }
+      .custom-modal-btn { font-size: 35px; font-weight: bold; padding: 12px 60px; background-color: #1a73e8; color: white; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 10px rgba(26, 115, 232, 0.3); transition: all 0.2s ease; }
+      @keyframes modalEffect { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      @media (max-width: 900px), (max-height: 650px) {
+        .container { padding: 15px; }
+        .header-section { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #ccc; padding-bottom: 20px; margin-bottom: 0px; flex-shrink: 0; }
+        .middle-section { gap: 15px; margin-top: 10px; }
+        .schedule-box { gap: 5px; font-size: 40px; }
+        .schedule-item { padding: 6px 15px; min-height: 55px; gap: 4px; }
+        .reminder-box { padding: 20px 20px 45px 20px; min-height: 150px; font-size: 40px; margin-top: -10px; margin-bottom: -10px;}
+        .footer-section { padding: 12px 20px; margin-top: 10px; font-size: 26px; }
+        .time-display { font-size: 80px; }
+        .countdown-box { padding: 30px 10px; min-width: 400px; }
+        .countdown-text, #countdown-timer { font-size: 60px; }
+        select, input[type="number"], .submit-btn { font-size: 24px; padding: 6px 12px; }
+        audio { width: 350px; height: 38px; }
+        .sub-time { width: 200px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="start-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 100000; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+      <h1 style="font-size: 60px; color: #333;">考試輔助系統</h1>
+      <button onclick="startSystem()" style="font-size: 40px; padding: 20px 60px; background: #fdd835; border: none; border-radius: 15px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">點擊啟用系統與廣播</button>
+    </div>
+
+    <div class="container">
+      <div class="header-section">
+        <div style="margin-left: 25px;">
+          <div style="font-size: 30px; color: #666;">現在時間 (台灣標準時間)</div> 
+          <div class="time-display" id="clock">載入中...</div>
+        </div>
+        
+        <div class="countdown-box" id="countdown-box">
+          <svg class="countdown-svg" id="countdown-svg">
+            <rect id="bg-rect" fill="white" stroke="#e0e0e0" stroke-width="22.5"></rect>
+            <rect id="progress-rect" fill="none" stroke-width="22.5"></rect>
+          </svg>
+          <div class="countdown-text">
+            <span id="countdown-status">準備載入中...</span>
+            <span id="countdown-timer"></span>
+          </div>
+          <div id="countdown-bear" class="countdown-bear">🐻</div>
+        </div>
+      </div>
+
+      <div class="middle-section">
+        <div class="schedule-box" id="schedule-container">
+          <div style="padding:22px; color:#666;">載入考試科目中...</div>
+        </div>
+        
+        <div class="reminder-box">
+          <div class="reminder-tag">提醒事項</div>
+          <span id="reminder-text">等待考試開始...</span>
+          <div class="reminder-hazard-stripes"></div>
+        </div>
+      </div>
+
+      <div class="footer-section">
+        <div>
+          班級 
+          <select id="class-select">
+            <option value="">請選擇</option>
+          </select>
+        </div>
+        <div>科目：<span class="current-subject-text" id="current-subject-label">非考試時間</span></div>
+        <div>缺考人數：<input type="number" id="absence-count" value="0" min="0" style="width: 150px;"></div> 
+        <button class="submit-btn" onclick="submitData()">送出</button>
+      </div>
+    </div>
+
+    <div id="custom-alert-modal" class="custom-modal-overlay">
+      <div class="custom-modal-box">
+        <div id="custom-modal-msg" class="custom-modal-message">提示訊息</div>
+        <button class="custom-modal-btn" onclick="closeCustomAlert()">確定</button>
+      </div>
+    </div>
+
+    <script>
+      // =========================================
+      // ⚠️ 請在這裡貼上你剛剛部署出來的 GAS 網址！
+      // =========================================
+      const GAS_API_URL = "在此貼上你的_GAS_網頁應用程式網址";
+      
+      // 從網址讀取 grade 參數 (例如: ?grade=101)，預設為 101
+      const urlParams = new URLSearchParams(window.location.search);
+      var currentGrade = urlParams.get('grade') || "101"; 
+
+      var scheduleData = [];
+      var currentSubjectName = "";
+      var timeOffset = 0; 
+      var playedStartAnnouncement = -1;
+      var playedEndAnnouncement = -1;
+      var playedSubjectAnnouncement = -1; 
+      var globalExamState = { isExam: false, startTime: null, endTime: null };
+      var bearAnimationId = null;
+
+      // 封裝與 GAS 溝通的共用 Fetch 函數
+      async function fetchGasApi(action, params = {}) {
+        let url = new URL(GAS_API_URL);
+        url.searchParams.append('action', action);
+        for (let key in params) {
+          url.searchParams.append(key, params[key]);
+        }
+        let response = await fetch(url);
+        return await response.json();
+      }
+
+      // 點擊啟用系統
+      function startSystem() {
+        document.getElementById('start-overlay').style.display = 'none';
+        
+        // 喚醒語音系統
+        if ('speechSynthesis' in window) {
+          let utterance = new SpeechSynthesisUtterance("系統已啟用");
+          utterance.volume = 0; // 靜音播報以解鎖權限
+          window.speechSynthesis.speak(utterance);
+        }
+
+        loadInitialData();
+      }
+
+      async function loadInitialData() {
+        try {
+          let res = await fetchGasApi('getInitialData', { grade: currentGrade });
+          if (res.success) {
+            initPage(res.data);
+          } else {
+            alert("載入資料失敗：" + res.msg);
+          }
+        } catch (error) {
+          alert("網路連線錯誤，無法載入考試排程。");
+        }
+      }
+
+      function initPage(data) {
+        var select = document.getElementById('class-select');
+        data.classes.forEach(function(cls) {
+          var opt = document.createElement('option');
+          opt.value = cls;
+          opt.innerHTML = cls;
+          select.appendChild(opt);
+        });
+
+        scheduleData = data.schedule;
+        renderSchedule();
+        triggerBackgroundAudioLoad();
+
+        async function syncServerTime(isInitialLoad) {
+          try {
+            let res = await fetchGasApi('getServerTime');
+            if (res.success) {
+              var serverTimestamp = res.data;
+              var localTimestamp = new Date().getTime();
+              timeOffset = serverTimestamp - localTimestamp; 
+              
+              if (isInitialLoad) {
+                updateClock(); 
+                setInterval(updateClock, 1000); 
+                window.addEventListener('resize', updateClock);
+                startBearAnimationLoop();
+              }
+            }
+          } catch(e) {
+            console.error("校時失敗", e);
+          }
+        }
+
+        syncServerTime(true);
+        setInterval(function() { syncServerTime(false); }, 19 * 60 * 1000);
+      }
+
+      function renderSchedule() {
+        var container = document.getElementById('schedule-container');
+        container.innerHTML = '';
+        
+        scheduleData.forEach(function(item, index) {
+          var div = document.createElement('div');
+          div.className = 'schedule-item';
+          div.id = 'schedule-item-' + index;
+          
+          var hasSubject = item.subject && item.subject.trim() !== "" && item.subject.indexOf("無") === -1 && item.subject.indexOf("休") === -1;
+          
+          var audioZoneContent = ''; 
+          if (hasSubject && item.subject.indexOf('英文') !== -1) {
+            if (item.hasMusic) {
+              audioZoneContent = `<span class="loading-text">⏳英聽檔準備中...</span>`;
+            } else {
+              audioZoneContent = `<span style="font-size:26px; color:red;">尚未上傳音檔</span>`; 
+            }
+          }
+
+          if (hasSubject) {
+            div.innerHTML = `
+              <div class="schedule-text-container">
+                <span class="sub-name">${item.subject}</span>
+                <span class="sub-time">${item.start}~${item.end}</span>
+              </div>
+              <span class="sub-audio-zone" id="audio-zone-${item.period}">${audioZoneContent}</span>
+            `;
+          } else {
+            div.innerHTML = `
+              <div class="schedule-text-container">
+                <span class="sub-name">${item.subject || ''}</span>
+                <span class="sub-time"></span>
+              </div>
+              <span class="sub-audio-zone" id="audio-zone-${item.period}"></span>
+            `;
+          }
+          container.appendChild(div);
+        });
+      }
+
+      function triggerBackgroundAudioLoad() {
+        scheduleData.forEach(async function(item) {
+          if (item.subject && item.subject.indexOf('英文') !== -1 && item.hasMusic) {
+            try {
+              let res = await fetchGasApi('getAudioBase64', { grade: currentGrade, period: item.period });
+              var zone = document.getElementById('audio-zone-' + item.period);
+              if (res.success && zone) {
+                zone.innerHTML = `
+                  <audio controls controlsList="nodownload" preload="auto">
+                    <source src="${res.dataUrl}" type="audio/mpeg">
+                  </audio>
+                `;
+              } else if (zone) {
+                zone.innerHTML = `<span style="color:red;font-size:26px;">音檔載入失敗</span>`; 
+              }
+            } catch(e) {
+              console.error("音檔讀取失敗");
+            }
+          }
+        });
+      }
+
+      function getCorrectedNow() { return new Date(new Date().getTime() + timeOffset); }
+
+      function parseTime(timeStr) {
+        var parts = timeStr.split(':');
+        var now = getCorrectedNow(); 
+        now.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+        return now;
+      }
+
+      function speakText(text) {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel(); 
+          var utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'zh-TW';
+          utterance.rate = 0.92;    
+          window.speechSynthesis.speak(utterance);
+        }
+      }
+
+      function updateSvgProgress(percentage, color) {
+        var box = document.getElementById('countdown-box');
+        var svg = document.getElementById('countdown-svg');
+        var bgRect = document.getElementById('bg-rect');
+        var progressRect = document.getElementById('progress-rect');
+        var w = box.offsetWidth, h = box.offsetHeight;
+        svg.setAttribute('width', w); svg.setAttribute('height', h);
+        
+        var strokeWidth = 22.5, inset = strokeWidth / 2; 
+        var rectW = w - strokeWidth, rectH = h - strokeWidth;
+        var outerRadius = 45, rectRadius = Math.max(0, outerRadius - inset); 
+
+        [bgRect, progressRect].forEach(rect => {
+          rect.setAttribute('x', inset); rect.setAttribute('y', inset);
+          rect.setAttribute('width', rectW); rect.setAttribute('height', rectH);
+          rect.setAttribute('rx', rectRadius); rect.setAttribute('ry', rectRadius);
+        });
+        
+        var perimeter = 2 * (rectW + rectH) - (8 * rectRadius) + (2 * Math.PI * rectRadius);
+        progressRect.style.strokeDasharray = perimeter;
+        progressRect.style.strokeDashoffset = perimeter - (percentage * perimeter);
+        progressRect.style.stroke = color;
+      }
+
+      function updateClock() {
+        var now = getCorrectedNow(); 
+        now.setMilliseconds(0);
+        document.getElementById('clock').innerText = now.toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Taipei' });
+
+        var activeIndex = -1, highlightIndex = -1;
+        var isExamTime = false, currentStartTime = null, currentEndTime = null;
+        currentSubjectName = "";
+        var percentage = 0, diffMs = 0;
+
+        var items = document.getElementsByClassName('schedule-item');
+        for (var i = 0; i < items.length; i++) items[i].classList.remove('active');
+
+        for (var i = 0; i < scheduleData.length; i++) {
+          var startTime = parseTime(scheduleData[i].start);
+          var endTime = parseTime(scheduleData[i].end);
+          var preStartTime = new Date(startTime.getTime() - 5 * 60 * 1000); 
+
+          if (now >= preStartTime && now <= endTime) highlightIndex = i;
+
+          if (now >= startTime && now <= endTime) {
+            activeIndex = i; isExamTime = true;
+            currentStartTime = startTime; currentEndTime = endTime;
+            currentSubjectName = scheduleData[i].subject;
+            
+            diffMs = endTime - now;
+            var diffMins = Math.floor(diffMs / 60000), diffSecs = Math.floor((diffMs % 60000) / 1000);
+            percentage = Math.max(0, Math.min(1, Math.floor(diffMs / 1000) / Math.floor((endTime - startTime) / 1000)));
+            
+            var color = percentage > 0.5 ? "#4caf50" : (percentage > 0.15 ? "#ff9800" : "#ff0000");
+            updateSvgProgress(percentage, color);
+            document.getElementById('countdown-status').innerText = '剩下：';
+            document.getElementById('countdown-timer').innerText = `${diffMins}分${diffSecs}秒`;
+            break;
+          }
+        }
+
+        globalExamState.isExam = isExamTime;
+        globalExamState.startTime = currentStartTime; globalExamState.endTime = currentEndTime;
+        var targetReminderHtml = "";
+
+        if (highlightIndex !== -1 && document.getElementById('schedule-item-' + highlightIndex)) {
+           document.getElementById('schedule-item-' + highlightIndex).classList.add('active');
+        }
+
+        if (isExamTime) {
+          document.getElementById('current-subject-label').innerText = currentSubjectName;
+          var elapsedMs = now - currentStartTime;
+          var elapsedMinutes = Math.floor(elapsedMs / 60000), elapsedSeconds = Math.floor(elapsedMs / 1000);  
+          var remainSeconds = Math.floor(diffMs / 1000);       
+          var reminderText = "";
+
+          if (elapsedSeconds >= 20 && elapsedSeconds <= 24 && playedSubjectAnnouncement !== activeIndex) {
+            speakText("這節課，考試科目是，" + currentSubjectName + "，請保持安靜！專心作答。");
+            playedSubjectAnnouncement = activeIndex; 
+          }
+          if (elapsedSeconds >= 60 && elapsedSeconds <= 64 && playedStartAnnouncement !== activeIndex) {
+            speakText("拿到考卷後，請先寫上班級、姓名、座號。");
+            playedStartAnnouncement = activeIndex; 
+          }
+          if (remainSeconds <= 60 && remainSeconds >= 56 && playedEndAnnouncement !== activeIndex) {
+            speakText("考試即將結束，請檢查班級、姓名、座號是否已填寫。");
+            playedEndAnnouncement = activeIndex;   
+          }
+
+          if (elapsedMinutes < 5) reminderText = "拿到考卷後，請先寫上班級、姓名、座號。";
+          else if (elapsedMinutes < 10) reminderText = "如有疑問請舉手示意，等待老師處理。";
+          else if (elapsedMinutes < 25) reminderText = "題目看清楚、寫完要檢查";
+          else if (elapsedMinutes < 35) reminderText = "作答完成，請檢查完再檢查或趴下休息，保持安靜！";
+          else reminderText = "考試即將結束，請檢查班級、姓名、座號是否已填寫。";
+          
+          targetReminderHtml = reminderText;
+        } else {
+          document.getElementById('countdown-status').innerText = '休息：';
+          document.getElementById('countdown-timer').innerText = '非考試中';
+          document.getElementById('current-subject-label').innerText = '非考試時間';
+          targetReminderHtml = '非考試時間，請安靜休息或準備下節考試。';
+          updateSvgProgress(0, "#e0e0e0");
+        }
+
+        var reminderContainer = document.getElementById('reminder-text');
+        if (reminderContainer && reminderContainer.innerHTML !== targetReminderHtml) {
+          reminderContainer.innerHTML = targetReminderHtml;
+        }
+      }
+
+      function startBearAnimationLoop() {
+        if (bearAnimationId) return;
+        function renderFrame() { updateBearGeometry(); bearAnimationId = requestAnimationFrame(renderFrame); }
+        bearAnimationId = requestAnimationFrame(renderFrame);
+      }
+
+      function updateBearGeometry() {
+        var bear = document.getElementById('countdown-bear');
+        var box = document.getElementById('countdown-box');
+        if (!bear || !box) return;
+
+        var w = box.offsetWidth, h = box.offsetHeight;
+        var strokeWidth = 22.5, inset = strokeWidth / 2; 
+        var rectW = w - strokeWidth, rectH = h - strokeWidth;
+        var r = Math.max(0, 45 - inset); 
+
+        var L_stW = rectW - 2 * r, L_stH = rectH - 2 * r, L_arc = (Math.PI / 2) * r;    
+        var perimeter = 2 * (L_stW + L_stH) + 4 * L_arc; 
+
+        var ratio = 0;
+        if (globalExamState.isExam && globalExamState.startTime && globalExamState.endTime) {
+          var total = globalExamState.endTime - globalExamState.startTime;
+          var remaining = globalExamState.endTime - getCorrectedNow();
+          ratio = Math.max(0, Math.min(1, remaining / total));
+        } else {
+          ratio = (new Date().getTime() / 12000) % 1; 
+        }
+
+        var dist = ratio * perimeter, x = 0, y = 0;
+
+        if (dist <= L_stW) { x = inset + r + dist; y = inset; } 
+        else if ((dist -= L_stW) <= L_arc) { var angle = -Math.PI / 2 + (dist / L_arc) * (Math.PI / 2); x = (inset + rectW - r) + r * Math.cos(angle); y = (inset + r) + r * Math.sin(angle); } 
+        else if ((dist -= L_arc) <= L_stH) { x = inset + rectW; y = inset + r + dist; } 
+        else if ((dist -= L_stH) <= L_arc) { var angle = 0 + (dist / L_arc) * (Math.PI / 2); x = (inset + rectW - r) + r * Math.cos(angle); y = (inset + rectH - r) + r * Math.sin(angle); } 
+        else if ((dist -= L_arc) <= L_stW) { x = inset + rectW - r - dist; y = inset + rectH; } 
+        else if ((dist -= L_stW) <= L_arc) { var angle = Math.PI / 2 + (dist / L_arc) * (Math.PI / 2); x = (inset + r) + r * Math.cos(angle); y = (inset + rectH - r) + r * Math.sin(angle); } 
+        else if ((dist -= L_arc) <= L_stH) { x = inset; y = inset + rectH - r - dist; } 
+        else { dist -= L_stH; var angle = Math.PI + (dist / L_arc) * (Math.PI / 2); x = (inset + r) + r * Math.cos(angle); y = (inset + r) + r * Math.sin(angle); }
+
+        bear.style.left = x + 'px'; bear.style.top = y + 'px'; bear.style.transform = 'translate(-50%, -50%)';
+      }
+
+      function showCustomAlert(msg) {
+        document.getElementById('custom-modal-msg').innerText = msg;
+        document.getElementById('custom-alert-modal').style.display = 'flex';
+      }
+      function closeCustomAlert() { document.getElementById('custom-alert-modal').style.display = 'none'; }
+
+      async function submitData() {
+        var cls = document.getElementById('class-select').value;
+        var count = document.getElementById('absence-count').value;
+
+        if (cls === "") { showCustomAlert("請選擇班級！"); return; }
+        if (currentSubjectName === "") { showCustomAlert("目前非考試時間，無法送出缺考資料！"); return; }
+
+        var btn = document.querySelector('.submit-btn');
+        btn.innerText = "傳送中...";
+        btn.disabled = true;
+
+        var userIp = "無法取得IP";
+        try {
+          let ipRes = await fetch('https://api.ipify.org?format=json');
+          let ipData = await ipRes.json();
+          userIp = ipData.ip;
+        } catch(e) { console.log("IP獲取失敗，繼續傳送"); }
+
+        try {
+          let res = await fetchGasApi('submitAbsenceData', { className: cls, subject: currentSubjectName, count: count, ip: userIp });
+          showCustomAlert(res.msg);
+          if (res.success) document.getElementById('absence-count').value = "0";
+        } catch(e) {
+          showCustomAlert("發生網路錯誤，請稍後再試。");
+        } finally {
+          btn.innerText = "送出";
+          btn.disabled = false;
+        }
+      }
+    </script>
+  </body>
+</html>
