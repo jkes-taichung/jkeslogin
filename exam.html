@@ -1,819 +1,962 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <base target="_top">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>建功國小考試網址與缺考監控中心</title>
-  
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
-  <style>
-    :root {
-      --primary-color: #3b82f6;
-      --primary-hover: #2563eb;
-      --bg-color: #f1f5f9;
-      --card-bg: #ffffff;
-      --text-main: #1e293b;
-      --text-muted: #64748b;
-      --border-color: #e2e8f0;
-      --table-header-bg: #f8fafc;
-    }
-
-    body {
-      font-family: "Microsoft JhengHei", "Noto Sans TC", Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      line-height: 1.6;
-    }
-
-    .container { max-width: 1400px; margin: 0 auto; }
-
-    .header-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: var(--card-bg);
-      padding: 16px 24px;
-      border-radius: 12px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-      margin-bottom: 24px;
-    }
-
-    .title-area { display: flex; align-items: center; gap: 15px; }
-    .title-text { font-size: 22px; font-weight: 800; color: #0f172a; }
-
-    .date-badge {
-      background-color: #e0f2fe;
-      color: #0369a1;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 14px;
-      font-weight: bold;
-    }
-
-    .header-actions { display: flex; gap: 12px; align-items: center; }
-
-    .refresh-btn, .upload-btn {
-      padding: 8px 16px;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: bold;
-      transition: all 0.2s ease;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .refresh-btn { background-color: var(--primary-color); }
-    .refresh-btn:hover { background-color: var(--primary-hover); }
-    .refresh-btn:disabled { background-color: #93c5fd !important; cursor: not-allowed; }
-    .refresh-btn.success { background-color: #10b981 !important; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); }
-    .refresh-btn svg { transform-origin: center; }
-    .spinning { animation: spin-btn-icon 1s linear infinite; }
-
-    @keyframes spin-btn-icon {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .upload-btn { background-color: #10b981; }
-    .upload-btn:hover { background-color: #059669; }
-
-    .card-section {
-      background: var(--card-bg);
-      border-radius: 12px;
-      padding: 24px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-      margin-bottom: 24px;
-    }
-
-    .section-title {
-      font-size: 20px;
-      font-weight: bold;
-      color: #0f172a;
-      margin-top: 0;
-      margin-bottom: 20px;
-      padding-bottom: 12px;
-      border-bottom: 2px solid var(--bg-color);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .section-title::before {
-      content: "";
-      display: inline-block;
-      width: 6px;
-      height: 20px;
-      background-color: var(--primary-color);
-      border-radius: 4px;
-    }
-
-    .grid-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
-      gap: 24px;
-    }
-
-    .grade-wrapper { border: 2px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #ffffff; }
-    .grade-header, .grade-sub-title { padding: 12px 16px; font-size: 16px; font-weight: bold; text-align: center; margin: 0; }
-
-    /* 各年級配色 */
-    .theme-g1 { border-color: #fca5a5; }
-    .theme-g1 .grade-header, .theme-g1 .grade-sub-title { background-color: #fee2e2; color: #991b1b; border-bottom: 1px solid #fca5a5; }
-    .theme-g2 { border-color: #fdba74; }
-    .theme-g2 .grade-header, .theme-g2 .grade-sub-title { background-color: #ffedd5; color: #9a3412; border-bottom: 1px solid #fdba74; }
-    .theme-g3 { border-color: #fcd34d; }
-    .theme-g3 .grade-header, .theme-g3 .grade-sub-title { background-color: #fef3c7; color: #92400e; border-bottom: 1px solid #fcd34d; }
-    .theme-g4 { border-color: #86efac; }
-    .theme-g4 .grade-header, .theme-g4 .grade-sub-title { background-color: #dcfce7; color: #166534; border-bottom: 1px solid #86efac; }
-    .theme-g5 { border-color: #93c5fd; }
-    .theme-g5 .grade-header, .theme-g5 .grade-sub-title { background-color: #dbeafe; color: #1e3a8a; border-bottom: 1px solid #93c5fd; }
-    .theme-g6 { border-color: #d8b4fe; }
-    .theme-g6 .grade-header, .theme-g6 .grade-sub-title { background-color: #f3e8ff; color: #581c87; border-bottom: 1px solid #d8b4fe; }
-
-    table { width: 100%; border-collapse: collapse; background-color: #ffffff; }
-    th, td { border-bottom: 1px solid var(--border-color); padding: 12px 16px; text-align: left; font-size: 14px; color: #475569; }
-    th { background-color: #f8fafc; font-weight: 600; color: #64748b; transition: background-color 0.3s; }
-    tbody tr:last-child td { border-bottom: none; }
-    tbody tr:hover { background-color: #f1f5f9; }
-
-    .th-alert {  color: #ef4444 !important; }
-    .status-not-filled { color: #94a3b8; font-style: italic; font-size: 13px; }
-
-    .btn-open-url {
-      display: inline-block;
-      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-      color: #ffffff !important;
-      padding: 8px 14px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 700;
-      text-decoration: none;
-      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
-      transition: all 0.2s ease;
-      white-space: nowrap;
-    }
-    .btn-open-url:hover {
-      background: linear-gradient(135deg, #2563eb, #1e40af);
-      box-shadow: 0 4px 8px rgba(37, 99, 235, 0.4);
-      transform: translateY(-2px);
-    }
-
-    /* 彈跳視窗 */
-    .modal-overlay {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(15, 23, 42, 0.6); z-index: 1000;
-      display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px);
-    }
-    .modal-content {
-      background: #ffffff; width: 90%; max-width: 600px; border-radius: 12px; padding: 30px;
-      position: relative; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-      animation: modalFadeIn 0.3s ease;
-    }
-    @keyframes modalFadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-
-    .modal-close-btn { position: absolute; top: 16px; right: 20px; font-size: 28px; color: #94a3b8; cursor: pointer; line-height: 1; }
-    .modal-close-btn:hover { color: #334155; }
-
-    .grade-buttons-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 8px; }
-    .grade-btn {
-      padding: 14px; border: 2px solid var(--border-color); background: #ffffff; border-radius: 8px;
-      font-size: 16px; font-weight: bold; color: #475569; cursor: pointer; transition: all 0.2s ease; text-align: center;
-    }
-    .grade-btn:hover { border-color: #93c5fd; background: #eff6ff; color: var(--primary-hover); }
-    .grade-btn.active { border-color: var(--primary-color); background: var(--primary-color); color: #ffffff; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2); }
-
-    .form-group { margin-bottom: 20px; }
-    .form-group label { display: block; margin-bottom: 10px; font-weight: 600; color: #334155; font-size: 15px; }
-    .form-control { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; font-size: 14px; }
-    .form-control:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
-
-    .btn-group { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-    .btn { padding: 9px 16px; border: 1px solid var(--border-color); background: #ffffff; color: #475569; border-radius: 6px; cursor: pointer; font-weight: 600; }
-    .btn-submit { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
-    .btn-submit:hover { background: var(--primary-hover); }
-
-    .action-link { background: #ffffff; border: 1px solid #166534; color: #166534; padding: 4px 10px; border-radius: 4px; font-size: 13px; text-decoration: none; font-weight: bold; }
-    .action-link:hover { background: #dcfce7; }
-    
-    .hidden { display: none !important; }
-    .status-empty { color: #94a3b8; font-style: italic; font-size: 13px; }
-    .status-loading { color: #64748b; text-align: center; padding: 20px !important; }
-    .notice-box { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin-bottom: 20px; color: #92400e; font-size: 14px; }
-    .btn-alert-confirm { background-color: #0c5ad9; color: white; border: none; padding: 10px 32px; font-size: 15px; font-weight: bold; border-radius: 50px; cursor: pointer; }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-  </style>
-</head>
-<body>
-
-<div class="container">
-  <div class="header-bar">
-    <div class="title-area">
-      <div class="title-text">建功國小考試網址與缺考監控中心</div>
-      <div class="date-badge" id="todayDateLabel">今日日期：載入中...</div>
-    </div>
-    <div class="header-actions">
-      <button class="upload-btn" onclick="openUploadModal()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-        上傳英聽檔案
-      </button>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      /* 調整為滿版設計 */
+      html, body { 
+        height: 100%; 
+        margin: 0; 
+        padding: 0; 
+        box-sizing: border-box; 
+      }
+      body { 
+        font-family: '微軟正黑體', sans-serif; 
+        background-color: #f0f0f0; 
+        display: flex;
+        justify-content: center;
+        align-items: stretch;
+      }
+      .container { 
+        width: 100%;
+        max-width: 100%; 
+        margin: 0; 
+        background: white; 
+        padding: 10px; 
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
       
-      <button id="refreshBtn" class="refresh-btn" onclick="fetchFirebaseData()">
-        <svg id="refreshIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 1 0 2.13-5.88L21 8"></path></svg>
-        <span id="refreshText">重新整理數據</span>
-      </button>
-    </div>
-  </div>
+      .header-section { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #ccc; padding-bottom: 10px; margin-bottom: 0px; flex-shrink: 0; }
+      
+      /* 現在時間字體 */
+      .time-display { font-size: 132px; font-weight: bold; white-space: nowrap; } 
+      
+      /* --- 圓方塊血條大小與字體調整 --- */
+      .countdown-box { 
+        position: relative; 
+        background-color: transparent; 
+        border: none; 
+        padding: 20px 20px;   
+        flex-grow: 1.5;     
+        min-width: 480px;   /* 🛡️ 防止大螢幕下被擠壓變形 */
+        margin-left: 45px; 
+        margin-right: 30px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        box-sizing: border-box; 
+      }
+      .countdown-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+      
+      /* 倒數提示字體 */
+      .countdown-text { 
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        font-size: 100px; 
+        color: #111; 
+        white-space: nowrap; 
+        z-index: 1; 
+        text-align: center; 
+      } 
 
-  <div class="card-section">
-    <h2 class="section-title">各年級考試網址總覽</h2>
-    <div id="gradeTablesContainer" class="grid-container"></div>
-  </div>
+      /* 動態倒數變數文字單獨加粗、加大 */
+      #countdown-timer { 
+        font-weight: bold; 
+        font-size: 100px; 
+        color: #000000; 
+      }
 
-  <div class="card-section">
-    <h2 class="section-title">本次缺考回報統計</h2>
-    <div class="grid-container">
-      <div class="grade-wrapper theme-g1">
-        <div class="grade-sub-title">一年級</div>
-        <table>
-          <thead><tr><th style="width: 25%;">班級</th><th id="th-g1-zh" style="width: 25%;">國語</th><th id="th-g1-life" style="width: 25%;">生活</th><th id="th-g1-math" style="width: 25%;">數學</th></tr></thead>
-          <tbody id="absenceBody1"><tr><td colspan="4" class="status-loading">載入中...</td></tr></tbody>
-        </table>
-      </div>
-      <div class="grade-wrapper theme-g2">
-        <div class="grade-sub-title">二年級</div>
-        <table>
-          <thead><tr><th style="width: 25%;">班級</th><th id="th-g2-zh" style="width: 25%;">國語</th><th id="th-g2-life" style="width: 25%;">生活</th><th id="th-g2-math" style="width: 25%;">數學</th></tr></thead>
-          <tbody id="absenceBody2"><tr><td colspan="4" class="status-loading">載入中...</td></tr></tbody>
-        </table>
-      </div>
-      <div class="grade-wrapper theme-g3">
-        <div class="grade-sub-title">三年級</div>
-        <table>
-          <thead><tr><th>班級</th><th id="th-g3-zh">國語</th><th id="th-g3-nature">自然</th><th id="th-g3-eng">英文</th><th id="th-g3-math">數學</th><th id="th-g3-society">社會</th></tr></thead>
-          <tbody id="absenceBody3"><tr><td colspan="6" class="status-loading">載入中...</td></tr></tbody>
-        </table>
-      </div>
-      <div class="grade-wrapper theme-g4">
-        <div class="grade-sub-title">四年級</div>
-        <table>
-          <thead><tr><th>班級</th><th id="th-g4-zh">國語</th><th id="th-g4-nature">自然</th><th id="th-g4-eng">英文</th><th id="th-g4-math">數學</th><th id="th-g4-society">社會</th></tr></thead>
-          <tbody id="absenceBody4"><tr><td colspan="6" class="status-loading">載入中...</td></tr></tbody>
-        </table>
-      </div>
-      <div class="grade-wrapper theme-g5">
-        <div class="grade-sub-title">五年級</div>
-        <table>
-          <thead><tr><th>班級</th><th id="th-g5-zh">國語</th><th id="th-g5-nature">自然</th><th id="th-g5-eng">英文</th><th id="th-g5-math">數學</th><th id="th-g5-society">社會</th></tr></thead>
-          <tbody id="absenceBody5"><tr><td colspan="6" class="status-loading">載入中...</td></tr></tbody>
-        </table>
-      </div>
-      <div class="grade-wrapper theme-g6">
-        <div class="grade-sub-title">六年級</div>
-        <table>
-          <thead><tr><th>班級</th><th id="th-g6-zh">國語</th><th id="th-g6-nature">自然</th><th id="th-g6-eng">英文</th><th id="th-g6-math">數學</th><th id="th-g6-society">社會</th></tr></thead>
-          <tbody id="absenceBody6"><tr><td colspan="6" class="status-loading">載入中...</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
+      /* 熊熊繞圈專用專屬樣式 */
+      .countdown-bear {
+        position: absolute;
+        font-size: 46px;     /* 🐻 確保熊熊永遠維持大尺寸 */
+        z-index: 10;
+        pointer-events: none;
+        transform: translate(-50%, -50%); 
+        transition: none;    
+      }
 
-<div id="uploadModal" class="modal-overlay hidden">
-  <div class="modal-content">
-    <span class="modal-close-btn" onclick="closeUploadModal()">&times;</span>
-    <h2 class="section-title" style="margin-top: 0; border-bottom: none; padding-bottom: 0;">英聽檔案上傳專區</h2>
-    
-    <div style="margin-top: 20px;">
-      <div class="form-group">
-        <label>1. 請點擊選擇要上傳的年級</label>
-        <div class="grade-buttons-grid">
-          <button class="grade-btn" id="btn-301" onclick="selectUploadGrade('301', '三年級')">三年級</button>
-          <button class="grade-btn" id="btn-401" onclick="selectUploadGrade('401', '四年級')">四年級</button>
-          <button class="grade-btn" id="btn-501" onclick="selectUploadGrade('501', '五年級')">五年級</button>
-          <button class="grade-btn" id="btn-601" onclick="selectUploadGrade('601', '六年級')">六年級</button>
-        </div>
-      </div>
+      /* 中間區塊自動填滿剩餘高度 */
+      .middle-section { display: flex; gap: 30px; margin-bottom: 0px; flex-grow: 1; align-items: stretch; }
+      
+      /* --- 課表佈局結構修改 --- */
+      .schedule-box { flex: 1; font-size: 42px; display: flex; flex-direction: column; gap: 10px; } 
+      
+      .schedule-item { display: flex; flex-direction: column; padding: 10px 22px; border-bottom: 1px solid #eee; min-height: 70px; gap: 8px; align-items: stretch; } 
+      .schedule-item.active { background-color: #fdd835; font-weight: bold; border-radius: 8px; } 
+      
+      /* --- 課表內容樣式 --- */
+      .schedule-text-container { display: flex; align-items: center; width: 100%; } 
+      
+      .sub-name { width: 150px; flex-shrink: 0; } 
+      .sub-time { width: 300px; flex-shrink: 0; text-align: left; } 
+      
+      /* 播放器區域 */
+      .sub-audio-zone { display: flex; align-items: center; justify-content: flex-start; width: 100%; margin-left: 0; margin-top: 5px;} 
 
-      <div id="pageAuthStep" class="hidden">
-        <div class="notice-box">
-          👉 您目前選擇的是：<strong id="selectedGradeText" style="font-size: 16px;">未選擇</strong>
-        </div>
-        <div class="form-group">
-          <label for="idSuffixInput">2. 老師身分驗證</label>
-          <input type="password" id="idSuffixInput" class="form-control" maxlength="6" placeholder="請輸入身分證字號後六碼">
+      /* 提醒事項方塊 */
+      .reminder-box { 
+        flex: 1; 
+        background-color: #fffde7; 
+        margin-right: 30px; 
+        padding: 20px 30px 10px 30px; 
+        border-radius: 15px; 
+        min-height: 230px;
+        text-align: center; 
+        position: relative; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        font-size: 60px; 
+        font-weight: bold; 
+        overflow: hidden;              
+      } 
+      .reminder-tag { position: absolute; top: 0; left: 0; background: gold; font-size: 26px; padding: 8px 15px; border-radius: 0 0 15px 0; z-index: 2; } 
+      
+      /* 黃黑斜線條紋 */
+      .reminder-hazard-stripes {
+        position: absolute;      
+        bottom: 0;                
+        left: 0;
+        width: 100%;
+        height: 24px;             
+        background: repeating-linear-gradient(
+          -45deg,
+          #ffdb3a,
+          #ffdb3a 15px,
+          #212121 15px,
+          #212121 30px
+        );
+        z-index: 1;
+      }
+
+      /* --- 底部表單欄位區 --- */
+      .footer-section { 
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between; 
+        background: #fff; 
+        padding: 20px 30px;        
+        border-top: 2px solid #e5e5e5; 
+        font-size: 38px; 
+        flex-shrink: 0; 
+        box-shadow: 0 -4px 10px rgba(0,0,0,0.02); 
+      } 
+
+      select, input[type="number"] { 
+        font-size: 33px; 
+        padding: 10px 15px; 
+        margin: 0 15px; 
+        border: 2px solid #dcdcdc;
+        border-radius: 8px;
+        background-color: #fafafa;
+        color: #333;
+        outline: none;
+        transition: all 0.2s ease-in-out;
+        vertical-align: middle;
+      } 
+
+      select:focus, input[type="number"]:focus {
+        border-color: #fdd835; 
+        background-color: #fff;
+        box-shadow: 0 0 8px rgba(253, 216, 53, 0.3);
+      }
+
+      .submit-btn { 
+        font-size: 33px; 
+        font-weight: bold;
+        padding: 10px 45px;        
+        border: none;              
+        background: #212121;       
+        color: white; 
+        cursor: pointer; 
+        border-radius: 8px; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: all 0.2s ease;
+      } 
+      
+      .submit-btn:hover { 
+        background: #424242;       
+        transform: translateY(-1px); 
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+      }
+
+      .submit-btn:active {
+        transform: translateY(1px);  
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+
+      .current-subject-text { color: red; font-weight: bold; }
+
+      /* --- 英聽原生播放器樣式 --- */
+      audio { 
+        width: 435px;           
+        height: 45px;           
+        outline: none; 
+        border-radius: 45px; 
+        filter: invert(1) hue-rotate(180deg) contrast(1.2); 
+      } 
+      
+      .loading-text { font-size: 30px; color: #ff9800; font-weight: bold; animation: blink 1.5s infinite; } 
+      @keyframes blink { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+
+      /* 彈跳視窗樣式 */
+      .custom-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.6);
+        display: none; 
+        justify-content: center;
+        align-items: center;
+        z-index: 99999; 
+      }
+      
+      .custom-modal-box {
+        background-color: #ffffff;
+        padding: 50px 70px;
+        border-radius: 24px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+        text-align: center;
+        max-width: 85%;
+        width: 700px;
+        animation: modalEffect 0.25s ease-out;
+      }
+
+      .custom-modal-message {
+        font-size: 45px; 
+        font-weight: bold;
+        color: #212121;
+        margin-bottom: 45px;
+        line-height: 1.5;
+        white-space: pre-line; 
+      }
+
+      .custom-modal-btn {
+        font-size: 35px;
+        font-weight: bold;
+        padding: 12px 60px;
+        background-color: #1a73e8; 
+        color: white;
+        border: none;
+        border-radius: 50px;
+        cursor: pointer;
+        box-shadow: 0 4px 10px rgba(26, 115, 232, 0.3);
+        transition: all 0.2s ease;
+      }
+
+      @keyframes modalEffect {
+        from { transform: scale(0.85); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+      }
+
+      /* 💻 筆電與低解析度螢幕優化 (RWD) */
+      @media (max-width: 900px), (max-height: 650px) {
+        .container { padding: 15px; }
+        
+        .header-section { 
+          display: flex; 
+          justify-content: space-between; 
+          align-items: center; 
+          border-bottom: 3px solid #ccc; 
+          padding-bottom: 20px; 
+          margin-bottom: 0px; 
+          flex-shrink: 0; 
+        }
+        
+        .middle-section { gap: 15px; margin-top: 10px; }
+        .schedule-box { gap: 5px; font-size: 40px; }
+        .schedule-item { padding: 6px 15px; min-height: 55px; gap: 4px; }
+        .reminder-box { padding: 20px 20px 45px 20px; min-height: 150px; font-size: 40px; margin-top: -10px; margin-bottom: -10px;}
+        .footer-section { padding: 12px 20px; margin-top: 10px; font-size: 26px; }
+        
+        .time-display { font-size: 80px; }
+        
+        /* 🛡️ 筆電模式下維持倒數方塊有足夠寬度，不被時間壓扁 */
+        .countdown-box { padding: 30px 10px; min-width: 400px; }
+        .countdown-text, #countdown-timer { font-size: 60px; }
+        select, input[type="number"], .submit-btn { font-size: 24px; padding: 6px 12px; }
+        audio { width: 350px; height: 38px; }
+        .sub-time { width: 200px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      
+      <div class="header-section">
+        <div style="margin-left: 25px;">
+          <div style="font-size: 30px; color: #666;">現在時間 (台灣標準時間)</div> 
+          <div class="time-display" id="clock">載入中...</div>
         </div>
         
-        <div class="form-group">
-          <label for="captchaInput">3. 圖形驗證碼 (點擊圖片可更換)</label>
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <input type="text" id="captchaInput" class="form-control" placeholder="請輸入驗證碼" style="max-width: 150px;" maxlength="4">
-            <canvas id="captchaCanvas" width="120" height="38" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: 6px; background-color: #f8fafc;" title="點擊更換驗證碼" onclick="generateCaptcha()"></canvas>
-            <span style="font-size: 13px; color: var(--primary-color); cursor: pointer; font-weight: bold; user-select: none;" onclick="generateCaptcha()">換一張</span>
+        <div class="countdown-box" id="countdown-box">
+          <svg class="countdown-svg" id="countdown-svg">
+            <rect id="bg-rect" fill="white" stroke="#e0e0e0" stroke-width="22.5"></rect>
+            <rect id="progress-rect" fill="none" stroke-width="22.5"></rect>
+          </svg>
+          <div class="countdown-text">
+            <span id="countdown-status"></span>
+            <span id="countdown-timer"></span>
           </div>
-        </div>
-
-        <div style="text-align: right; margin-top: 15px;">
-          <button class="refresh-btn" onclick="processPageVerify()">送出驗證</button>
+          <div id="countdown-bear" class="countdown-bear">🐻</div>
         </div>
       </div>
 
-      <div id="pageUploadStep" class="hidden">
-        <div style="background: #ecfdf5; border: 1px solid #10b981; color: #047857; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-weight: bold; text-align: center;">
-          ✓ 驗證成功！歡迎 <span id="teacherName"></span> 老師
+      <div class="middle-section">
+        <div class="schedule-box" id="schedule-container">
+          <div style="padding:22px; color:#666;">載入考試科目中...</div>
         </div>
         
-        <div id="uploadFormControls">
-          <div class="form-group">
-            <label for="audioFileInput">4. 請選取電腦中的英聽音檔</label>
-            <input type="file" id="audioFileInput" class="form-control" accept="audio/*,.mp3,.wav,.m4a,.wma">
-          </div>
-          <div class="btn-group">
-            <button class="btn" onclick="resetUploadForm()">重選年級</button>
-            <button class="btn btn-submit" onclick="processPageUpload()">確認送出上傳</button>
-          </div>
-        </div>
-
-        <div id="uploadSpinner" class="hidden" style="text-align: center; padding: 20px 0;">
-          <svg style="animation: spin 1s linear infinite; color: #3b82f6; width: 36px; height: 36px; margin: 0 auto 12px auto; display: block;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-          <p style="color: #3b82f6; font-weight: bold; margin: 0; font-size: 14px;">檔案上傳中並更新資料庫，請稍候...</p>
+        <div class="reminder-box">
+          <div class="reminder-tag">提醒事項</div>
+          <span id="reminder-text">等待考試開始...</span>
+          <div class="reminder-hazard-stripes"></div>
         </div>
       </div>
-    </div>
-  </div>
-</div>
 
-<div id="customAlertModal" class="modal-overlay hidden" style="z-index: 2000;">
-  <div class="modal-content" style="max-width: 440px; padding: 24px; border-radius: 12px;">
-    <div id="customAlertMessage" style="font-size: 16px; color: var(--text-main); margin: 10px 0 28px 0; white-space: pre-line; text-align: left; font-weight: 500;"></div>
-    <div style="text-align: right;">
-      <button class="btn-alert-confirm" id="customAlertBtn" onclick="closeCustomAlert()">確定</button>
+      <div class="footer-section">
+        <div>
+          班級 
+          <select id="class-select">
+            <option value="">請選擇</option>
+          </select>
+        </div>
+        <div>科目：<span class="current-subject-text" id="current-subject-label">非考試時間</span></div>
+        <div>缺考人數：<input type="number" id="absence-count" value="0" min="0" style="width: 150px;"></div> 
+        <button class="submit-btn" onclick="submitData()">送出</button>
+      </div>
+
     </div>
-  </div>
-</div>
+
+    <div id="custom-alert-modal" class="custom-modal-overlay">
+      <div class="custom-modal-box">
+        <div id="custom-modal-msg" class="custom-modal-message">提示訊息</div>
+        <button class="custom-modal-btn" onclick="closeCustomAlert()">確定</button>
+      </div>
+    </div>
 
 <script>
-  // 1. Firebase 初始化
-  const firebaseConfig = {
-    databaseURL: "https://exam-e38aa-default-rtdb.asia-southeast1.firebasedatabase.app"
-  };
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-  }
-  const database = firebase.database();
+      // Firebase Realtime DB URL
+      const FIREBASE_DB_URL = "https://exam-e38aa-default-rtdb.asia-southeast1.firebasedatabase.app";
+      var urlParams = new URLSearchParams(window.location.search);
+var currentGrade = urlParams.get('grade');
+      var scheduleData = [];
+      var currentSubjectName = "";
+      var timeOffset = 0; 
 
-  // 2. Supabase 初始化整合
-  const SUPABASE_URL = "https://ltkvavtvwyrholntnzik.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_secret_Vpqx_J0I4q3H1yxSTVeXzA_sBmmedAm";
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      var playedStartAnnouncement = -1;
+      var playedEndAnnouncement = -1;
+      var playedSubjectAnnouncement = -1; 
 
-  // 互動狀態變數
-  let currentSelectedGradeCode = '';
-  let currentSelectedGradeName = '';
-  let generatedCaptchaCode = '';
+      var globalExamState = {
+        isExam: false,
+        startTime: null,
+        endTime: null
+      };
+      var bearAnimationId = null;
 
-  window.onload = function() {
-    const today = new Date();
-    document.getElementById('todayDateLabel').innerText = `今日日期：${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}`;
-    startRealtimeSync();
-  };
+      // 當頁面載入時，改為透過 Fetch 請求 Firebase 資料
+      window.onload = async function() {
+        try {
+          var data = await fetchInitialData(currentGrade);
+          initPage(data);
+        } catch (error) {
+          console.error("載入初始資料失敗：", error);
+          // 強化錯誤顯示：把真正的錯誤原因印在畫面上，方便抓蟲
+          document.getElementById('clock').innerText = "系統異常";
+          document.getElementById('schedule-container').innerHTML = `<div style="padding:22px; color:red; font-size:20px;">資料載入失敗！<br><br>錯誤原因：${error.message}<br><br>請檢查 Firebase 資料庫是否有空白或格式錯誤。</div>`;
+        }
+      };
 
-  // 視窗控制
-  function customAlert(message) {
-    document.getElementById('customAlertMessage').innerText = message;
-    document.getElementById('customAlertModal').classList.remove('hidden');
-  }
-  function closeCustomAlert() { document.getElementById('customAlertModal').classList.add('hidden'); }
-  function openUploadModal() { document.getElementById('uploadModal').classList.remove('hidden'); resetUploadForm(); }
-  function closeUploadModal() { document.getElementById('uploadModal').classList.add('hidden'); }
-  // 強制下載音檔的輔助函式
-async function downloadAudioFile(url, fileName) {
-  try {
-    // 提醒：使用 fetch 可以將檔案轉換為 Blob，強制瀏覽器「下載」而不是直接在分頁中「播放」
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('網路回應錯誤');
-    const blob = await response.blob();
-    
-    // 嘗試從網址抓取副檔名，如果抓不到就預設為 mp3
-    let ext = url.split('.').pop().split('?')[0];
-    if (!['mp3', 'wav', 'm4a', 'wma', 'ogg'].includes(ext.toLowerCase())) {
-      ext = 'mp3';
-    }
+      // 從 Firebase 獲取班級與課表資料
+      async function fetchInitialData(gradeStr) {
+        // 1. 抓取班級清單
+        let clsRes = await fetch(`${FIREBASE_DB_URL}/exam/班級.json`);
+        let classData = await clsRes.json();
+        let classes = classData ? Object.values(classData) : [];
 
-    // 建立暫時的 Blob URL 與隱藏的 <a> 標籤來觸發下載
-    const blobUrl = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = blobUrl;
-    a.download = `${fileName}.${ext}`; // 設定下載的預設檔名
-    
-    document.body.appendChild(a);
-    a.click();
-    
-    // 下載完成後清理記憶體
-    window.URL.revokeObjectURL(blobUrl);
-    document.body.removeChild(a);
-    
-  } catch (error) {
-    console.error('Blob 下載失敗，改用新分頁開啟:', error);
-    // 💡 備用方案：如果 Supabase 的 CORS (跨域) 設定阻擋了 fetch，就直接開新分頁讓老師按右鍵下載
-    window.open(url, '_blank');
-  }
-}
+        // 2. 抓取時間/課表設定
+        let timeRes = await fetch(`${FIREBASE_DB_URL}/exam/時間.json`);
+        let timeData = await timeRes.json();
 
-  // 雲端轉換連結修正（保留給相容格式）
-  function convertToDirectDownloadUrl(url) {
-    if (!url) return "";
-    if (url.indexOf("uc?export=download") > -1) return url; 
-    const match = url.match(/\/file\/d\/([^\/]+)/);
-    if (match && match[1]) return "https://drive.google.com/uc?export=download&id=" + match[1];
-    return url;
-  }
-
-  function fetchFirebaseData() {
-    startRealtimeSync();
-  }
-
-  // Firebase 即時同步偵聽
-  function startRealtimeSync() {
-    const btn = document.getElementById('refreshBtn');
-    const icon = document.getElementById('refreshIcon');
-    const text = document.getElementById('refreshText');
-
-    if (btn && icon && text) {
-      btn.disabled = true;
-      icon.classList.add('spinning');
-      text.innerText = '連線 Firebase 中...';
-    }
-
-    database.ref('exam').off('value'); 
-    database.ref('exam').on('value', snapshot => {
-      const examData = snapshot.val() || {};
-      
-      const timeNode = examData.時間 || [];
-      const classesNode = examData.班級 || [];
-      const absenceNode = examData.缺考 || [];
-    const classUrls = "https://exam-e38aa.web.app/index.html";
-
-      renderGradeTablesFromFirebase(timeNode, classUrls);
-      buildAbsenceTablesWithPreload(classesNode, absenceNode);
-
-      if (btn && icon && text) {
-        icon.classList.remove('spinning');
-        btn.classList.add('success');
-        text.innerText = '✓ 即時同步中';
-        setTimeout(() => {
-          btn.disabled = false;
-          btn.classList.remove('success');
-          text.innerText = '重新整理數據';
-        }, 1200);
-      }
-    }, err => {
-      console.error(err);
-      customAlert("Firebase 連線失敗：" + err.message);
-      if (btn && icon && text) {
-        btn.disabled = false;
-        icon.classList.remove('spinning');
-        text.innerText = '重新整理數據';
-      }
-    });
-  }
-
-
-  
-
-  // 缺考回報統計表格渲染
-  function buildAbsenceTablesWithPreload(classesNode, absenceNode) {
-    const bodies = {
-      1: document.getElementById('absenceBody1'),
-      2: document.getElementById('absenceBody2'),
-      3: document.getElementById('absenceBody3'),
-      4: document.getElementById('absenceBody4'),
-      5: document.getElementById('absenceBody5'),
-      6: document.getElementById('absenceBody6')
-    };
-
-    let htmls = { 1: "", 2: "", 3: "", 4: "", 5: "", 6: "" };
-    let gradeCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-
-    let subjectAlerts = {
-      1: { zh: false, life: false, math: false },
-      2: { zh: false, life: false, math: false },
-      3: { zh: false, nature: false, eng: false, math: false, society: false },
-      4: { zh: false, nature: false, eng: false, math: false, society: false },
-      5: { zh: false, nature: false, eng: false, math: false, society: false },
-      6: { zh: false, nature: false, eng: false, math: false, society: false }
-    };
-
-    const formatAbsence = (val) => {
-      if (val === undefined || val === null || val === "") return `<span class="status-not-filled">未填</span>`;
-      const num = parseInt(val, 10);
-      if (!isNaN(num) && num > 0) return `<span style="color: #ef4444; font-size: 18px; font-weight: 800;">${val}</span>`;
-      return "0";
-    };
-
-    const getNumValue = (val) => {
-      if (val === undefined || val === null || val === "") return 0;
-      const num = parseInt(val, 10);
-      return (!isNaN(num) && num > 0) ? num : 0;
-    };
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const fifteenDaysInMs = 15 * 24 * 60 * 60 * 1000;
-    const minTime = today.getTime() - fifteenDaysInMs;
-    const maxTime = today.getTime() + fifteenDaysInMs;
-
-    const absenceMap = {};
-    const absenceList = Array.isArray(absenceNode) ? absenceNode : Object.values(absenceNode);
-    
-    absenceList.forEach(rec => {
-      if (rec && rec.班級) {
-        let recDateStr = rec.日期 || rec.時間戳記 || rec.timestamp;
-        let isWithinRange = true;
-        if (recDateStr) {
-          let recDate = new Date(recDateStr);
-          if (!isNaN(recDate.getTime())) {
-            let recTime = recDate.getTime();
-            if (recTime < minTime || recTime > maxTime) isWithinRange = false;
+        let scheduleObj = null;
+        if (timeData) {
+          // 找到對應目前年級的設定 (grade: 101 等)
+          for (let key in timeData) {
+            // 🛡️ 防當機裝甲：加上 timeData[key] != null 的判斷
+            if (timeData[key] && String(timeData[key].grade) === String(gradeStr)) {
+              scheduleObj = timeData[key];
+              break;
+            }
           }
         }
-        if (isWithinRange) absenceMap[String(rec.班級).trim()] = rec;
+
+        let scheduleList = [];
+        if (scheduleObj) {
+          for (let i = 1; i <= 8; i++) {
+            let startStr = scheduleObj[`${i}start`];
+            let endStr = scheduleObj[`${i}end`];
+            let subjStr = scheduleObj[`${i}subject`];
+            let musicData = scheduleObj[`${i}music`];
+
+            if (startStr && subjStr) {
+              scheduleList.push({
+                period: i,
+                start: String(startStr), // 🛡️ 防當機：強制轉字串，避免 Firebase 把 "08:00" 變數字
+                end: String(endStr),
+                subject: subjStr,
+                hasMusic: !!musicData,
+                music: musicData || ""      // 🎯 維持您原本的 music 設定
+              });
+            }
+          }
+        }
+        return { classes: classes, schedule: scheduleList };
       }
-    });
 
-    let classList = [];
-    if (Array.isArray(classesNode)) {
-      classList = classesNode;
-    } else if (typeof classesNode === 'object') {
-      Object.keys(classesNode).forEach(k => { if (k !== '網址') classList.push(classesNode[k]); });
-    }
+      function initPage(data) {
+        var select = document.getElementById('class-select');
+        
+        // 🎯 1. 建立阿拉伯數字與中文年級的對照表
+        const gradeMap = {
+          '1': '一', '2': '二', '3': '三', '4': '四',
+          '5': '五', '6': '六', '7': '七', '8': '八', '9': '九'
+        };
 
-    classList.forEach(className => {
-      if (!className || typeof className !== 'string') return;
-      className = className.trim();
+        // 🎯 2. 取得目前年級的第一個數字 (例如："401" -> "4", "102" -> "1")
+        var firstDigit = String(currentGrade).charAt(0);
+        var targetChinesePrefix = gradeMap[firstDigit]; // 對應出 "四" 或 "一"
 
-      let gradeNum = 0;
-      if (/^[一1]/.test(className)) gradeNum = 1;
-      else if (/^[二2]/.test(className)) gradeNum = 2;
-      else if (/^[三3]/.test(className)) gradeNum = 3;
-      else if (/^[四4]/.test(className)) gradeNum = 4;
-      else if (/^[五5]/.test(className)) gradeNum = 5;
-      else if (/^[六6]/.test(className)) gradeNum = 6;
+        data.classes.forEach(function(cls) {
+          if (cls) { // 🛡️ 防當機：濾掉 Firebase 的空班級
+            
+            // 🎯 3. 檢查班級的第一個字是否符合對應的中文年級 (例如："四年1班" 是否以 "四" 開頭)
+            // 🛡️ 安全機制：如果網址沒帶參數或對照失敗，則預設顯示所有班級，避免選單全空
+            if (!targetChinesePrefix || cls.startsWith(targetChinesePrefix)) {
+              var opt = document.createElement('option');
+              opt.value = cls;
+              opt.innerHTML = cls;
+              select.appendChild(opt);
+            }
+            
+          }
+        });
 
-      if (gradeNum >= 1 && gradeNum <= 6) {
-        gradeCounts[gradeNum]++;
-        const record = absenceMap[className] || {};
+        scheduleData = data.schedule;
+        renderSchedule();
+        triggerBackgroundAudioLoad();
 
-        if (getNumValue(record.國語) > 0) subjectAlerts[gradeNum].zh = true;
-        if (getNumValue(record.數學) > 0) subjectAlerts[gradeNum].math = true;
-        if (gradeNum <= 2 && getNumValue(record.生活) > 0) subjectAlerts[gradeNum].life = true;
-        if (gradeNum >= 3) {
-          if (getNumValue(record.自然) > 0) subjectAlerts[gradeNum].nature = true;
-          if (getNumValue(record.英文) > 0) subjectAlerts[gradeNum].eng = true;
-          if (getNumValue(record.社會) > 0) subjectAlerts[gradeNum].society = true;
+        syncServerTime(true);
+        setInterval(function() { syncServerTime(false); }, 19 * 60 * 1000);
+      }
+
+      // 改用第三方 API (WorldTimeAPI) 來抓取標準時間
+      async function syncServerTime(isInitialLoad) {
+        try {
+          let response = await fetch('https://worldtimeapi.org/api/timezone/Asia/Taipei');
+          let data = await response.json();
+          let serverTimestamp = new Date(data.utc_datetime).getTime();
+          let localTimestamp = new Date().getTime();
+          timeOffset = serverTimestamp - localTimestamp; 
+        } catch (err) {
+          console.warn("無法取得伺服器時間，使用本地時間");
+          timeOffset = 0;
         }
 
-        const zh = formatAbsence(record.國語);
-        const math = formatAbsence(record.數學);
-        const nature = formatAbsence(record.自然);
-        const eng = formatAbsence(record.英文);
-        const society = formatAbsence(record.社會);
-        const life = formatAbsence(record.生活);
+        if (isInitialLoad) {
+          updateClock(); 
+          setInterval(updateClock, 1000); 
+          window.addEventListener('resize', updateClock);
+          startBearAnimationLoop();
+        }
+      }
 
-        if (gradeNum === 1 || gradeNum === 2) {
-          htmls[gradeNum] += `<tr><td style="font-weight: 600; color: #1e293b;">${className}</td><td>${zh}</td><td>${life}</td><td>${math}</td></tr>`;
+      function renderSchedule() {
+        var container = document.getElementById('schedule-container');
+        container.innerHTML = '';
+        
+        // 🛡️ 防當機：如果課表沒抓到，顯示提示而不是空白
+        if (scheduleData.length === 0) {
+            container.innerHTML = '<div style="padding:15px; color:#666;">無此年級的課表資料。</div>';
+            return;
+        }
+
+        scheduleData.forEach(function(item, index) {
+          var div = document.createElement('div');
+          div.className = 'schedule-item';
+          div.id = 'schedule-item-' + index;
+          
+          var hasSubject = item.subject && typeof item.subject === 'string' && item.subject.trim() !== "" && item.subject.indexOf("無") === -1 && item.subject.indexOf("休") === -1;
+          
+          var audioZoneContent = ''; 
+          if (hasSubject && item.subject.indexOf('英文') !== -1) {
+            if (item.hasMusic) {
+              audioZoneContent = `<span class="loading-text">⏳音檔準備中...</span>`;
+            } else {
+              audioZoneContent = `<span style="font-size:26px; color:red;">尚未上傳音檔</span>`; 
+            }
+          }
+
+          if (hasSubject) {
+            div.innerHTML = `
+              <div class="schedule-text-container">
+                <span class="sub-name">${item.subject}</span>
+                <span class="sub-time">${item.start}~${item.end}</span>
+              </div>
+              <span class="sub-audio-zone" id="audio-zone-${item.period}">${audioZoneContent}</span>
+            `;
+          } else {
+            div.innerHTML = `
+              <div class="schedule-text-container">
+                <span class="sub-name">${item.subject || ''}</span>
+                <span class="sub-time"></span>
+              </div>
+              <span class="sub-audio-zone" id="audio-zone-${item.period}"></span>
+            `;
+          }
+          container.appendChild(div);
+        });
+      }
+
+
+  function triggerBackgroundAudioLoad() {
+        scheduleData.forEach(function(item) {
+          if (item.subject && typeof item.subject === 'string' && item.subject.indexOf('英文') !== -1 && item.hasMusic) {
+            var audioUrl = item.music || "";
+            var zone = document.getElementById('audio-zone-' + item.period);
+            
+            if (!zone) return;
+
+            if (audioUrl === "") {
+              zone.innerHTML = `<span style="color:red;font-size:26px;">無音檔網址資料(試算表中為空)</span>`;
+              return; 
+            }
+
+            // 直接將 Firebase 抓到的網址作為音檔來源
+            zone.innerHTML = `
+           <audio controls controlsList="nodownload" preload="metadata" crossorigin="anonymous">
+                <source src="${audioUrl}" type="audio/mpeg">
+                您的瀏覽器不支援音訊播放。
+              </audio>
+            `;
+          }
+        });
+      }
+
+      function getCorrectedNow() {
+        var correctedTimestamp = new Date().getTime() + timeOffset;
+        return new Date(correctedTimestamp);
+      }
+
+      function parseTime(timeStr) {
+        // 🛡️ 防當機：確保時間字串存在且可切割
+        if (!timeStr || typeof timeStr.split !== 'function') return new Date();
+        var parts = timeStr.split(':');
+        var now = getCorrectedNow(); 
+        now.setHours(parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0, 0, 0);
+        return now;
+      }
+
+      function speakText(text) {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel(); 
+          var utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'zh-TW';
+          utterance.rate = 0.92;    
+          window.speechSynthesis.speak(utterance);
+        }
+      }
+
+      function updateSvgProgress(percentage, color) {
+        var box = document.getElementById('countdown-box');
+        var svg = document.getElementById('countdown-svg');
+        var bgRect = document.getElementById('bg-rect');
+        var progressRect = document.getElementById('progress-rect');
+        
+        if (!box || !svg || !bgRect || !progressRect) return; // 🛡️ 防呆
+
+        var w = box.offsetWidth;
+        var h = box.offsetHeight;
+        
+        svg.setAttribute('width', w);
+        svg.setAttribute('height', h);
+        
+        var strokeWidth = 22.5; 
+        var inset = strokeWidth / 2; 
+        var rectW = w - strokeWidth;
+        var rectH = h - strokeWidth;
+        var outerRadius = 45; 
+        var rectRadius = outerRadius - inset; 
+        if (rectRadius < 0) rectRadius = 0;
+
+        bgRect.setAttribute('x', inset);
+        bgRect.setAttribute('y', inset);
+        bgRect.setAttribute('width', rectW);
+        bgRect.setAttribute('height', rectH);
+        bgRect.setAttribute('rx', rectRadius);
+        bgRect.setAttribute('ry', rectRadius);
+        
+        progressRect.setAttribute('x', inset);
+        progressRect.setAttribute('y', inset);
+        progressRect.setAttribute('width', rectW);
+        progressRect.setAttribute('height', rectH);
+        progressRect.setAttribute('rx', rectRadius);
+        progressRect.setAttribute('ry', rectRadius);
+        
+        var perimeter = 2 * (rectW + rectH) - (8 * rectRadius) + (2 * Math.PI * rectRadius);
+        progressRect.style.strokeDasharray = perimeter;
+        
+        var offset = perimeter - (percentage * perimeter);
+        progressRect.style.strokeDashoffset = offset;
+        progressRect.style.stroke = color;
+      }
+
+      function updateClock() {
+        var now = getCorrectedNow(); 
+        now.setMilliseconds(0);
+        var timeString = now.toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Taipei' });
+        
+        var clockEl = document.getElementById('clock');
+        if (clockEl) clockEl.innerText = timeString;
+
+        var activeIndex = -1;
+        var highlightIndex = -1; 
+        var isExamTime = false;
+        var currentStartTime = null;
+        var currentEndTime = null;
+        currentSubjectName = "";
+
+        var items = document.getElementsByClassName('schedule-item');
+        for (var i = 0; i < items.length; i++) {
+          items[i].classList.remove('active');
+        }
+
+        var percentage = 0;
+        var diffMs = 0;
+
+        for (var i = 0; i < scheduleData.length; i++) {
+          if (!scheduleData[i].start || !scheduleData[i].end) continue;
+
+          var startTime = parseTime(scheduleData[i].start);
+          var endTime = parseTime(scheduleData[i].end);
+          var preStartTime = new Date(startTime.getTime() - 5 * 60 * 1000); 
+
+          if (now >= preStartTime && now <= endTime) {
+            highlightIndex = i;
+          }
+
+          if (now >= startTime && now <= endTime) {
+            activeIndex = i;
+            isExamTime = true;
+            currentStartTime = startTime;
+            currentEndTime = endTime;
+            currentSubjectName = scheduleData[i].subject;
+            
+            diffMs = endTime - now;
+            var diffMins = Math.floor(diffMs / 60000);
+            var diffSecs = Math.floor((diffMs % 60000) / 1000);
+            
+            var totalSeconds = Math.floor((endTime - startTime) / 1000); 
+            var remainSeconds = Math.floor(diffMs / 1000);
+            percentage = remainSeconds / totalSeconds;
+            
+            if (percentage > 1) percentage = 1;
+            if (percentage < 0) percentage = 0;
+
+            var color = "#4caf50";
+            if (percentage > 0.5) {
+              color = "#4caf50"; 
+            } else if (percentage > 0.15) {
+              color = "#ff9800"; 
+            } else {
+              color = "#ff0000"; 
+            }
+            
+            updateSvgProgress(percentage, color);
+            var statusEl = document.getElementById('countdown-status');
+            var timerEl = document.getElementById('countdown-timer');
+            if (statusEl) statusEl.innerText = '剩下：';
+            if (timerEl) timerEl.innerText = `${diffMins}分${diffSecs}秒`;
+            break;
+          }
+        }
+
+        globalExamState.isExam = isExamTime;
+        globalExamState.startTime = currentStartTime;
+        globalExamState.endTime = currentEndTime;
+
+        var targetReminderHtml = "";
+
+        if (highlightIndex !== -1) {
+          var hlEl = document.getElementById('schedule-item-' + highlightIndex);
+          if (hlEl) hlEl.classList.add('active');
+        }
+
+        if (isExamTime) {
+          var subEl = document.getElementById('current-subject-label');
+          if (subEl) subEl.innerText = currentSubjectName;
+
+          var elapsedMs = now - currentStartTime;
+          var elapsedMinutes = Math.floor(elapsedMs / 60000); 
+          var elapsedSeconds = Math.floor(elapsedMs / 1000);  
+          var remainSeconds = Math.floor(diffMs / 1000);       
+          var reminderText = "";
+
+          if (elapsedSeconds >= 25 && elapsedSeconds <= 29 && playedSubjectAnnouncement !== activeIndex) {
+            speakText("這節課，考試科目是，" + currentSubjectName + "，請保持安靜！專心作答。");
+            playedSubjectAnnouncement = activeIndex; 
+          }
+
+          if (elapsedSeconds >= 60 && elapsedSeconds <= 64 && playedStartAnnouncement !== activeIndex) {
+            speakText("拿到考卷後，請先寫上班級、姓名、座號。");
+            playedStartAnnouncement = activeIndex; 
+          }
+
+          if (remainSeconds <= 60 && remainSeconds >= 56 && playedEndAnnouncement !== activeIndex) {
+            speakText("考試即將結束，請檢查班級、姓名、座號是否已填寫。");
+            playedEndAnnouncement = activeIndex;   
+          }
+
+          if (elapsedMinutes < 5) {
+            reminderText = "拿到考卷後，請先寫上班級、姓名、座號。";
+          } else if (elapsedMinutes >= 5 && elapsedMinutes < 10) {
+            reminderText = "如有疑問請舉手示意，等待老師處理。";
+          } else if (elapsedMinutes >= 10 && elapsedMinutes < 25) {
+            reminderText = "題目看清楚、寫完要檢查";
+          } else if (elapsedMinutes >= 25 && elapsedMinutes < 35) {
+            reminderText = "作答完成，請檢查完再檢查或趴下休息，保持安靜！";
+          } else {
+            reminderText = "考試即將結束，請檢查班級、姓名、座號是否已填寫。";
+          }
+          targetReminderHtml = reminderText;
+
         } else {
-          htmls[gradeNum] += `<tr><td style="font-weight: 600; color: #1e293b;">${className}</td><td>${zh}</td><td>${nature}</td><td>${eng}</td><td>${math}</td><td>${society}</td></tr>`;
+          var statusEl = document.getElementById('countdown-status');
+          var timerEl = document.getElementById('countdown-timer');
+          var subEl = document.getElementById('current-subject-label');
+
+          if(statusEl) statusEl.innerText = '休息：';
+          if(timerEl) timerEl.innerText = '非考試中';
+          if(subEl) subEl.innerText = '非考試時間';
+          
+          targetReminderHtml = '非考試時間，請安靜休息或準備下節考試。';
+          updateSvgProgress(0, "#e0e0e0");
         }
-      }
-    });
 
-    const toggleThAlert = (id, isActive) => {
-      const th = document.getElementById(id);
-      if (th) {
-        if (isActive) th.classList.add('th-alert');
-        else th.classList.remove('th-alert');
-      }
-    };
-
-    for (let i = 1; i <= 6; i++) {
-      if (bodies[i]) {
-        if (gradeCounts[i] > 0) bodies[i].innerHTML = htmls[i];
-        else {
-          let cols = (i === 1 || i === 2) ? 4 : 6;
-          bodies[i].innerHTML = `<tr><td colspan="${cols}" style="text-align:center; color:#94a3b8; padding: 20px;">資料庫內無預載班級</td></tr>`;
+        var reminderContainer = document.getElementById('reminder-text');
+        if (reminderContainer && reminderContainer.innerHTML !== targetReminderHtml) {
+          reminderContainer.innerHTML = targetReminderHtml;
         }
       }
 
-      toggleThAlert(`th-g${i}-zh`, subjectAlerts[i].zh);
-      toggleThAlert(`th-g${i}-math`, subjectAlerts[i].math);
-      if (i <= 2) {
-        toggleThAlert(`th-g${i}-life`, subjectAlerts[i].life);
-      } else {
-        toggleThAlert(`th-g${i}-nature`, subjectAlerts[i].nature);
-        toggleThAlert(`th-g${i}-eng`, subjectAlerts[i].eng);
-        toggleThAlert(`th-g${i}-society`, subjectAlerts[i].society);
-      }
-    }
-  }
-
-  // 考試網址表格渲染
-  function renderGradeTablesFromFirebase(timeNode, classUrls) {
-    const container = document.getElementById('gradeTablesContainer');
-    if (!container) return;
-    
-    const gradeConfigs = [
-      { name: "一年級", theme: "theme-g1", gradeCode: "101", d1Sub: "國語、生活", d2Sub: "數學", hasMusic: false },
-      { name: "二年級", theme: "theme-g2", gradeCode: "201", d1Sub: "國語、生活", d2Sub: "數學", hasMusic: false },
-      { name: "三年級", theme: "theme-g3", gradeCode: "301", d1Sub: "國語、自然、英文", d2Sub: "數學、社會", hasMusic: true },
-      { name: "四年級", theme: "theme-g4", gradeCode: "401", d1Sub: "國語、自然、英文", d2Sub: "數學、社會", hasMusic: true },
-      { name: "五年級", theme: "theme-g5", gradeCode: "501", d1Sub: "國語、自然、英文", d2Sub: "數學、社會", hasMusic: true },
-      { name: "六年級", theme: "theme-g6", gradeCode: "601", d1Sub: "國語、自然、英文", d2Sub: "數學、社會", hasMusic: true }
-    ];
-
-    const timeMap = {};
-    const timeList = Array.isArray(timeNode) ? timeNode : Object.values(timeNode);
-    timeList.forEach(item => { if (item && item.grade) timeMap[String(item.grade)] = item; });
-
-    let html = "";
-    gradeConfigs.forEach(g => {
-      let downloadLinkHtml = `<span class="status-empty">-</span>`;
-      
-    if (g.hasMusic) {
-  const gradeData = timeMap[g.gradeCode];
-  const rawAudioUrl = gradeData ? (gradeData["3music"] || "") : "";
-  
-  if (rawAudioUrl) {
-    // 💡 點擊時改為呼叫 downloadAudioFile 函式，並帶入該年級名稱作為下載檔名
-    downloadLinkHtml = `<a href="javascript:void(0)" onclick="downloadAudioFile('${rawAudioUrl}', '${g.name}_英聽測驗音檔')" class="action-link">下載音檔</a>`;
-  } else {
-    downloadLinkHtml = `<span class="status-empty" style="color:#ef4444; font-weight:600;">未上傳</span>`;
-  }
-}
-
-      const separator = classUrls.includes('?') ? '&' : '?';
-      const gradePrefix = g.gradeCode.charAt(0);
-      const day1Url = `${classUrls}${separator}grade=${gradePrefix}01`;
-      const day2Url = `${classUrls}${separator}grade=${gradePrefix}02`;
-
-      html += `
-        <div class="grade-wrapper ${g.theme}">
-          <div class="grade-header">${g.name}</div>
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 20%;">考試日期</th>
-                <th style="width: 40%;">測驗科目</th>
-                <th style="width: 16%; text-align: center;">英聽下載</th>
-                <th style="text-align: center;">測驗網址</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="font-weight: 600;">1️⃣第一天</td>
-                <td>${g.d1Sub}</td>
-                <td style="text-align: center;">${downloadLinkHtml}</td>
-                <td style="text-align: center;"><a href="${day1Url}" target="_blank" class="btn-open-url">開啟網址 ➜</a></td>
-              </tr>
-              <tr>
-                <td style="font-weight: 600;">2️⃣第二天</td>
-                <td>${g.d2Sub}</td>
-                <td style="text-align: center;"><span class="status-empty">-</span></td>
-                <td style="text-align: center;"><a href="${day2Url}" target="_blank" class="btn-open-url">開啟網址 ➜</a></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>`;
-    });
-    container.innerHTML = html;
-  }
-
-  // 上傳介面與驗證碼處理
-  function selectUploadGrade(gradeCode, gradeName) {
-    currentSelectedGradeCode = gradeCode;
-    currentSelectedGradeName = gradeName;
-    document.querySelectorAll('.grade-btn').forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`btn-${gradeCode}`).classList.add('active');
-    document.getElementById('selectedGradeText').innerText = `${gradeName} (${gradeCode})`;
-    document.getElementById('pageAuthStep').classList.remove('hidden');
-    document.getElementById('idSuffixInput').value = '';
-    document.getElementById('captchaInput').value = '';
-    generateCaptcha();
-  }
-
-  function resetUploadForm() {
-    currentSelectedGradeCode = ''; currentSelectedGradeName = '';
-    document.querySelectorAll('.grade-btn').forEach(btn => btn.classList.remove('active'));
-    document.getElementById('pageAuthStep').classList.add('hidden');
-    document.getElementById('pageUploadStep').classList.add('hidden');
-    document.getElementById('uploadFormControls').classList.remove('hidden');
-    document.getElementById('uploadSpinner').classList.add('hidden');
-    document.getElementById('audioFileInput').value = '';
-  }
-
-  function generateCaptcha() {
-    const canvas = document.getElementById('captchaCanvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    generatedCaptchaCode = Math.floor(1000 + Math.random() * 9000).toString();
-    ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    for (let i = 0; i < 4; i++) {
-      ctx.strokeStyle = `rgba(${Math.random()*150},${Math.random()*150},${Math.random()*150},0.3)`;
-      ctx.beginPath(); ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
-      ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height); ctx.stroke();
-    }
-    ctx.font = 'bold 20px Arial'; ctx.fillStyle = '#1e3a8a'; ctx.textBaseline = 'middle';
-    for (let i = 0; i < generatedCaptchaCode.length; i++) {
-      ctx.save(); ctx.translate(20 + i * 24, canvas.height / 2);
-      ctx.rotate((Math.random() * 20 - 10) * Math.PI / 180);
-      ctx.fillText(generatedCaptchaCode[i], 0, 0); ctx.restore();
-    }
-  }
-
-  function processPageVerify() {
-    const idSuffix = document.getElementById('idSuffixInput').value.trim();
-    const captchaInput = document.getElementById('captchaInput').value.trim();
-    if (!idSuffix || idSuffix.length !== 6) { customAlert('請輸入身分證字號後六碼！'); return; }
-    if (captchaInput !== generatedCaptchaCode) { customAlert('圖形驗證碼錯誤，請重新輸入！'); generateCaptcha(); document.getElementById('captchaInput').value = ''; return; }
-    
-    document.getElementById('teacherName').innerText = currentSelectedGradeName;
-    document.getElementById('pageAuthStep').classList.add('hidden');
-    document.getElementById('pageUploadStep').classList.remove('hidden');
-  }
-
-  // 核心改寫：真實上傳至 Supabase Storage 並更新 Firebase 網址
-  async function processPageUpload() {
-    const fileInput = document.getElementById('audioFileInput');
-    const file = fileInput.files[0];
-    if (!file) { customAlert('請先選取要上傳的音檔檔案！'); return; }
-
-    document.getElementById('uploadFormControls').classList.add('hidden');
-    document.getElementById('uploadSpinner').classList.remove('hidden');
-
-    try {
-      // 1. 產生不重複的安全純英數字檔名
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${currentSelectedGradeCode}_${Date.now()}.${fileExt}`;
-      
-      // 2. 使用 SDK 上傳至 Supabase 儲存桶 'exam'
-      const { data: uploadData, error: uploadError } = await supabaseClient.storage
-        .from('exam')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
-
-      if (uploadError) throw uploadError;
-
-      // 3. 取得 Supabase 的 Public 公開直連網址
-      const { data: urlData } = supabaseClient.storage
-        .from('exam')
-        .getPublicUrl(fileName);
-      
-      const supabasePublicUrl = urlData.publicUrl;
-
-      // 4. 將網址即時同步回寫至 Firebase DB
-      const timeRef = database.ref('exam/時間');
-      const snapshot = await timeRef.once('value');
-      let isUpdated = false;
-
-      snapshot.forEach(childSnapshot => {
-        if (String(childSnapshot.val().grade) === currentSelectedGradeCode) {
-          childSnapshot.ref.update({ '3music': supabasePublicUrl });
-          isUpdated = true;
+      function startBearAnimationLoop() {
+        if (bearAnimationId) return;
+        function renderFrame() {
+          updateBearGeometry();
+          bearAnimationId = requestAnimationFrame(renderFrame);
         }
-      });
-
-      if (!isUpdated) {
-        await timeRef.push({
-          grade: currentSelectedGradeCode,
-          '3music': supabasePublicUrl
-        });
+        bearAnimationId = requestAnimationFrame(renderFrame);
       }
 
-      // 5. 上傳成功後的介面收尾
-      document.getElementById('uploadSpinner').classList.add('hidden');
-      customAlert(`🎉 ${currentSelectedGradeName} 英聽音檔上傳成功！\n檔案已妥善儲存至 Supabase，並已同步更新網頁下載連結。`);
-      closeUploadModal();
+      function updateBearGeometry() {
+        var bear = document.getElementById('countdown-bear');
+        var box = document.getElementById('countdown-box');
+        if (!bear || !box) return;
 
-    } catch (err) {
-      console.error("Supabase 上傳出錯：", err);
-      document.getElementById('uploadSpinner').classList.add('hidden');
-      document.getElementById('uploadFormControls').classList.remove('hidden');
-      customAlert('儲存失敗，請檢查網路或權限設定：\n' + err.message);
-    }
-  }
-</script>
-</body>
+        var w = box.offsetWidth;
+        var h = box.offsetHeight;
+        
+        var strokeWidth = 22.5;
+        var inset = strokeWidth / 2; 
+        var rectW = w - strokeWidth;
+        var rectH = h - strokeWidth;
+        var outerRadius = 45;
+        var r = outerRadius - inset; 
+        if (r < 0) r = 0;
+
+        var L_stW = rectW - 2 * r;        
+        var L_stH = rectH - 2 * r;        
+        var L_arc = (Math.PI / 2) * r;    
+        var perimeter = 2 * (L_stW + L_stH) + 4 * L_arc; 
+
+        var ratio = 0;
+        if (globalExamState.isExam && globalExamState.startTime && globalExamState.endTime) {
+          var now = getCorrectedNow();
+          var total = globalExamState.endTime - globalExamState.startTime;
+          var remaining = globalExamState.endTime - now;
+          ratio = remaining / total;
+          if (ratio > 1) ratio = 1;
+          if (ratio < 0) ratio = 0;
+        } else {
+          var timestamp = new Date().getTime();
+          ratio = (timestamp / 12000) % 1; 
+        }
+
+        var dist = ratio * perimeter;
+        var x = 0;
+        var y = 0;
+
+        if (dist <= L_stW) {
+          x = inset + r + dist;
+          y = inset;
+        } else if ((dist -= L_stW) <= L_arc) {
+          var angle = -Math.PI / 2 + (dist / L_arc) * (Math.PI / 2);
+          x = (inset + rectW - r) + r * Math.cos(angle);
+          y = (inset + r) + r * Math.sin(angle);
+        } else if ((dist -= L_arc) <= L_stH) {
+          x = inset + rectW;
+          y = inset + r + dist;
+        } else if ((dist -= L_stH) <= L_arc) {
+          var angle = 0 + (dist / L_arc) * (Math.PI / 2);
+          x = (inset + rectW - r) + r * Math.cos(angle);
+          y = (inset + rectH - r) + r * Math.sin(angle);
+        } else if ((dist -= L_arc) <= L_stW) {
+          x = inset + rectW - r - dist;
+          y = inset + rectH;
+        } else if ((dist -= L_stW) <= L_arc) {
+          var angle = Math.PI / 2 + (dist / L_arc) * (Math.PI / 2);
+          x = (inset + r) + r * Math.cos(angle);
+          y = (inset + rectH - r) + r * Math.sin(angle);
+        } else if ((dist -= L_arc) <= L_stH) {
+          x = inset;
+          y = inset + rectH - r - dist;
+        } else {
+          dist -= L_stH;
+          var angle = Math.PI + (dist / L_arc) * (Math.PI / 2);
+          x = (inset + r) + r * Math.cos(angle);
+          y = (inset + r) + r * Math.sin(angle);
+        }
+
+        bear.style.left = x + 'px';
+        bear.style.top = y + 'px';
+        bear.style.transform = 'translate(-50%, -50%)';
+      }
+
+      function showCustomAlert(msg) {
+        var modalMsg = document.getElementById('custom-modal-msg');
+        var modalAlert = document.getElementById('custom-alert-modal');
+        if (modalMsg && modalAlert) {
+          modalMsg.innerText = msg;
+          modalAlert.style.display = 'flex';
+        } else {
+          alert(msg);
+        }
+      }
+
+      function closeCustomAlert() {
+        var modalAlert = document.getElementById('custom-alert-modal');
+        if (modalAlert) modalAlert.style.display = 'none';
+      }
+
+      function submitData() {
+        var clsEl = document.getElementById('class-select');
+        var countEl = document.getElementById('absence-count');
+        if (!clsEl || !countEl) return;
+
+        var cls = clsEl.value;
+        var count = countEl.value;
+
+        if (cls === "") { showCustomAlert("請選擇班級！"); return; }
+        if (currentSubjectName === "") { showCustomAlert("目前非考試時間，無法送出缺考資料！"); return; }
+
+        var btn = document.querySelector('.submit-btn');
+        if (btn) {
+          btn.innerText = "獲取IP中...";
+          btn.disabled = true;
+        }
+
+        fetch('https://api.ipify.org?format=json')
+          .then(function(response) { return response.json(); })
+          .then(function(data) {
+            var userIp = data.ip;
+            sendDataToBackend(cls, currentSubjectName, count, userIp);
+          })
+          .catch(function(error) {
+            sendDataToBackend(cls, currentSubjectName, count, "無法取得IP");
+          });
+      }
+
+      // 改為使用 Fetch 更新 Firebase 資料庫，取代原 GAS 邏輯
+      async function sendDataToBackend(cls, subject, count, ip) {
+        var btn = document.querySelector('.submit-btn');
+        if (btn) btn.innerText = "傳送中...";
+        
+        try {
+          let localNow = new Date();
+          localNow.setHours(0, 0, 0, 0);
+          let todayDateISO = localNow.toISOString(); 
+
+          let res = await fetch(`${FIREBASE_DB_URL}/exam/缺考.json`);
+          let absences = await res.json() || {};
+
+          let targetKey = null;
+          let maxIndex = -1;
+
+          for (let key in absences) {
+            if (!isNaN(key)) maxIndex = Math.max(maxIndex, parseInt(key));
+            let record = absences[key];
+            if (record && record.班級 === cls && record.日期 === todayDateISO) {
+              targetKey = key;
+            }
+          }
+
+          if (targetKey !== null) {
+            let patchData = {};
+            patchData[subject] = parseInt(count);
+            patchData.ip = ip;
+            
+            await fetch(`${FIREBASE_DB_URL}/exam/缺考/${targetKey}.json`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(patchData)
+            });
+          } else {
+            let newIndex = maxIndex + 1;
+            let newData = {
+              ip: ip,
+              日期: todayDateISO,
+              班級: cls,
+              國語: subject === '國語' ? parseInt(count) : 0,
+              數學: subject === '數學' ? parseInt(count) : 0,
+              生活: subject === '生活' ? parseInt(count) : "",
+              社會: subject === '社會' ? parseInt(count) : "",
+              自然: subject === '自然' ? parseInt(count) : "",
+              英文: subject === '英文' ? parseInt(count) : 0
+            };
+            
+            await fetch(`${FIREBASE_DB_URL}/exam/缺考/${newIndex}.json`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newData)
+            });
+          }
+
+          showCustomAlert("資料送出成功！");
+          if (btn) {
+            btn.innerText = "送出";
+            btn.disabled = false;
+          }
+          var countEl = document.getElementById('absence-count');
+          if (countEl) countEl.value = "0";
+
+        } catch (err) {
+          showCustomAlert("發生錯誤：" + err.message);
+          if (btn) {
+            btn.innerText = "送出";
+            btn.disabled = false;
+          }
+        }
+      }
+
+      
+    </script>
+  </body>
 </html>
